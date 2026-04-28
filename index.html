@@ -187,7 +187,7 @@
         const isMobile = window.innerWidth <= 600;
         const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
         
-        // OPTIMIZACIÓN: Apagar antialias en móvil y limitar Pixel Ratio para salvar recursos
+        // Optimización móvil
         const renderer = new THREE.WebGLRenderer({ 
             antialias: !isMobile, 
             powerPreference: "high-performance" 
@@ -257,8 +257,6 @@
         }
 
         // --- 2. GALLERY MANAGER ---
-        const textureLoader = new THREE.TextureLoader(); textureLoader.setCrossOrigin('anonymous');
-        
         const GalleryManager = {
             frames: [], wallTitles: [],
             
@@ -365,7 +363,6 @@
                 this.frames.forEach((f, i) => { const c = frameConfigs[i]; if(c) f.group.position.set(c.px, c.py, c.pz); });
             },
 
-            // OPTIMIZACIÓN: Interceptar la imagen, hacerle resize via Canvas y pasar versión ligera a GPU
             injectTexture: function(frameIndex, url) {
                 if(!this.frames[frameIndex]) return;
                 this.frames[frameIndex].url = url;
@@ -373,7 +370,7 @@
                 const img = new Image();
                 img.crossOrigin = "anonymous";
                 img.onload = () => {
-                    // Limitar tamaño para que no explote la VRAM en móviles
+                    // Restringir resolución en móvil/web para evitar crasheo
                     const MAX_SIZE = 1024;
                     let width = img.width;
                     let height = img.height;
@@ -388,7 +385,6 @@
                         }
                     }
 
-                    // Usar un canvas para comprimir los pixeles antes de mandarlos al 3D
                     const canvas = document.createElement('canvas');
                     canvas.width = width;
                     canvas.height = height;
@@ -397,16 +393,16 @@
 
                     const texture = new THREE.CanvasTexture(canvas);
                     texture.encoding = THREE.sRGBEncoding;
+                    texture.needsUpdate = true; // Forzar a Three.js a reconocer la textura
 
                     const aspect = width / height;
                     const cMesh = this.frames[frameIndex].canvasMesh;
                     const bMesh = this.frames[frameIndex].borderMesh;
                     const targetH = this.frames[frameIndex].height;
 
-                    // Limpiar memoria vieja para evitar leaks
+                    if (cMesh.material.map) cMesh.material.map.dispose();
                     if (cMesh.geometry) cMesh.geometry.dispose();
                     if (bMesh.geometry) bMesh.geometry.dispose();
-                    if (cMesh.material.map) cMesh.material.map.dispose();
 
                     cMesh.geometry = new THREE.PlaneGeometry(targetH * aspect, targetH);
                     bMesh.geometry = new THREE.BoxGeometry((targetH * aspect) + 0.4, targetH + 0.4, 0.2);
@@ -414,11 +410,12 @@
                     cMesh.material.map = texture; 
                     cMesh.material.color.setHex(0xffffff); 
                     cMesh.material.needsUpdate = true;
-
-                    // Liberar RAM del canvas temporal
-                    canvas.width = 0;
-                    canvas.height = 0;
                 };
+
+                img.onerror = () => {
+                    console.error("Error al cargar la imagen:", url);
+                };
+
                 img.src = url;
             },
 
