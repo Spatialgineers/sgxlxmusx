@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SGX Gallery Builder - Clean</title>
+    
+    <style>
+        :root {
+            --sgx-yellow: #FDCC0D;
+            --sgx-blue: #32527B;
+            --sgx-bg: #050505;
+        }
+
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: var(--sgx-bg);
+            font-family: 'Courier New', Courier, monospace;
+            color: var(--sgx-yellow);
+            touch-action: none;
+        }
+
+        canvas { 
+            display: block; 
+            position: absolute;
+            top: 0; left: 0; z-index: 1;
+        }
+
+        /* BANNER HIGH-TECH */
+        #powered-by-banner {
+            position: absolute;
+            top: 25px;
+            left: 0;
+            background: linear-gradient(90deg, rgba(10,10,10,0.95) 0%, rgba(50,82,123,0.8) 100%);
+            border-left: 5px solid var(--sgx-yellow);
+            border-top-right-radius: 6px;
+            border-bottom-right-radius: 6px;
+            color: var(--sgx-yellow);
+            padding: 10px 20px 10px 15px;
+            font-size: 11px;
+            font-weight: 900;
+            z-index: 9999;
+            pointer-events: none;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            border: 1px solid rgba(253, 204, 13, 0.2);
+            border-left: 5px solid var(--sgx-yellow);
+        }
+
+        .banner-accent {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: var(--sgx-yellow);
+            box-shadow: 0 0 10px var(--sgx-yellow);
+            transform: rotate(45deg);
+        }
+
+        /* Controles de Navegación */
+        #nav-controls {
+            position: absolute;
+            bottom: 35px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+            padding: 0 10px;
+            box-sizing: border-box;
+            gap: 15px;
+            z-index: 40;
+        }
+
+        .nav-btn {
+            background: rgba(10, 10, 10, 0.85);
+            border: 1px solid var(--sgx-blue);
+            color: #ccc;
+            padding: 12px 20px;
+            border-radius: 4px;
+            font-family: inherit;
+            font-weight: 900;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            font-size: 0.85rem;
+        }
+
+        .nav-btn:hover { border-color: var(--sgx-yellow); color: #fff; }
+        .nav-btn.active { background: var(--sgx-yellow); color: #000; border-color: var(--sgx-yellow); }
+
+        /* Ajustes Móvil */
+        @media (max-width: 600px) {
+            #nav-controls { bottom: 20px; gap: 10px; }
+            .nav-btn { padding: 10px 10px; font-size: 0.7rem; flex: 1 1 calc(25% - 10px); text-align: center; }
+            #powered-by-banner { top: 15px; font-size: 9px; padding: 8px 15px 8px 10px; }
+        }
+    </style>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.module.js"
+        }
+    }
+    </script>
+</head>
+<body>
+
+    <div id="powered-by-banner">
+        <span class="banner-accent"></span>
+        Powered by Spatialgineers
+    </div>
+    
+    <div id="scene-container"></div>
+
+    <div id="nav-controls">
+        <button class="nav-btn active" id="btn-intro">Intro</button>
+        <button class="nav-btn" id="btn-ladoa">Lado A</button>
+        <button class="nav-btn" id="btn-ladob">Lado B</button>
+        <button class="nav-btn" id="btn-outro">Outro</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // ============================================================================
+        // 🛠️ CONFIGURACIÓN DE TAMAÑOS INDIVIDUALES DE LOS CUADROS (BACKEND)
+        // ============================================================================
+        const TAMAÑOS_DE_CUADROS = [
+            { posicion: 'Frente (Intro)',  height: 4.62, label: 'pieza #1' },
+            { posicion: 'Lado A',          height: 4.62, label: 'pieza #2' },
+            { posicion: 'Lado A',          height: 4.62, label: 'pieza #3' },
+            { posicion: 'Lado A',          height: 4.62, label: 'pieza #4' },
+            { posicion: 'Lado A',          height: 4.62, label: 'pieza #5' },
+            { posicion: 'Lado B',          height: 4.62, label: 'pieza #6' },
+            { posicion: 'Lado B',          height: 4.62, label: 'pieza #7' },
+            { posicion: 'Lado B',          height: 4.62, label: 'pieza #8' },
+            { posicion: 'Lado B',          height: 4.62, label: 'pieza #9' },
+            { posicion: 'Espalda (Outro)', height: 4.62, label: 'pieza #10' }
+        ];
+
+        // --- ESTADO Y CONFIGURACIÓN BASE ---
+        const SGX = {
+            targetCamX: 0, targetCamY: 0,
+            currentCamX: 0, currentCamY: 0,
+            targetAngle: 0, currentAngle: 0,
+            currentCamZBase: 6.18,
+            
+            config: {
+                boxWidth: 33.18, boxHeight: 20.31, boxDepth: 26.6,
+                boxTextureUrl: "https://static.wixstatic.com/media/3302a4_701b48ec4a524ff49e2cb94f13bfb776~mv2.jpeg",
+                textureScale: 0.15, 
+                showGrids: true, 
+                camDistance: 6.18,
+                amplitudX: 3, amplitudY: 3, suavizado: 0.05,
+                invertirX: false, invertirY: true,
+                frameStyle: "Neon Glow",
+                frameUrls: [
+                    "https://static.wixstatic.com/media/3302a4_87922b6b6dc34f3f802ba142439f8c47~mv2.jpeg",
+                    "https://static.wixstatic.com/media/3302a4_87be7ecb9f584beca82e4d7780bd941a~mv2.jpeg",
+                    "https://static.wixstatic.com/media/3302a4_ddd8af4eef2d43249557bc7b0a64a9b2~mv2.jpeg",
+                    "https://static.wixstatic.com/media/3302a4_b6fcbe8018b946f695965ead56cfe9fa~mv2.jpeg",
+                    "https://static.wixstatic.com/media/3302a4_4ec3469e96c3450b8fc1bb198a6aeb3b~mv2.jpeg",
+                    "https://static.wixstatic.com/media/3302a4_83f0d3aa14c04d408fd12da8c698d554~mv2.jpeg",
+                    "https://static.wixstatic.com/media/3302a4_804a4f40b04a4cccb0950b83f61da0ff~mv2.jpeg",
+                    "https://static.wixstatic.com/media/3302a4_701b48ec4a524ff49e2cb94f13bfb776~mv2.jpeg",
+                    "https://static.wixstatic.com/media/3302a4_b0b14749a886452cbcbbcc9ec852f76a~mv2.jpeg",
+                    "https://static.wixstatic.com/media/3302a4_771b4745a487480d8174ab9538b18d4b~mv2.jpeg"
+                ]
+            }
+        };
+
+        // --- THREE.JS ENGINE ---
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x020202, 0.018);
+        
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        document.getElementById('scene-container').appendChild(renderer.domElement);
+
+        const amb = new THREE.AmbientLight(0xffffff, 0.5); scene.add(amb);
+        const spot = new THREE.SpotLight(0xffffff, 1.8);
+        spot.position.set(0, 10, 5); spot.angle = Math.PI / 3; spot.penumbra = 0.6; spot.decay = 2; spot.distance = 60;
+        scene.add(spot);
+
+        // --- 1. ENTORNO PARAMÉTRICO ---
+        let roomGroup = new THREE.Group(); scene.add(roomGroup);
+        let roomMesh, gridBottom, gridTop;
+
+        const boxTexLoader = new THREE.TextureLoader(); boxTexLoader.setCrossOrigin('anonymous');
+        let currentTexUrl = ''; let baseTex = null;
+
+        function initRoom() {
+            roomMesh = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), []);
+            roomGroup.add(roomMesh);
+            GalleryManager.buildFrames(SGX.config.boxWidth, SGX.config.boxHeight, SGX.config.boxDepth);
+            updateRoomDimensions(); 
+        }
+
+        function updateRoomDimensions() {
+            const { boxWidth: w, boxHeight: h, boxDepth: d, textureScale: tScale } = SGX.config;
+            
+            if (currentTexUrl !== SGX.config.boxTextureUrl) {
+                currentTexUrl = SGX.config.boxTextureUrl;
+                baseTex = boxTexLoader.load(currentTexUrl);
+                baseTex.wrapS = THREE.RepeatWrapping; baseTex.wrapT = THREE.RepeatWrapping;
+                baseTex.encoding = THREE.sRGBEncoding;
+            }
+
+            roomMesh.geometry.dispose();
+            roomMesh.geometry = new THREE.BoxGeometry(w, h, d);
+
+            const createWallMat = (repeatU, repeatV) => {
+                const tex = baseTex.clone();
+                tex.repeat.set(-repeatU * tScale, repeatV * tScale);
+                tex.needsUpdate = true;
+                return new THREE.MeshStandardMaterial({ map: tex, color: 0x777777, side: THREE.BackSide, roughness: 0.9, metalness: 0.1 });
+            };
+
+            const matX = createWallMat(d, h); const matY = createWallMat(w, d); const matZ = createWallMat(w, h); 
+
+            if (roomMesh.material && roomMesh.material.length > 0) { roomMesh.material.forEach(m => { if (m.map) m.map.dispose(); m.dispose(); }); }
+            roomMesh.material = [matX, matX, matY, matY, matZ, matZ];
+
+            if (gridBottom) { gridBottom.geometry.dispose(); roomGroup.remove(gridBottom); gridBottom = null; }
+            if (gridTop) { gridTop.geometry.dispose(); roomGroup.remove(gridTop); gridTop = null; }
+
+            if (SGX.config.showGrids) {
+                gridBottom = new THREE.GridHelper(Math.max(w, d), 25, 0x32527B, 0x111111);
+                gridBottom.position.y = -h / 2 + 0.05; roomGroup.add(gridBottom);
+                
+                gridTop = new THREE.GridHelper(Math.max(w, d), 25, 0xFDCC0D, 0x111111);
+                gridTop.position.y = h / 2 - 0.05; roomGroup.add(gridTop);
+            }
+
+            if (GalleryManager.frames.length > 0) { GalleryManager.updateFramePositions(w, h, d); }
+        }
+
+        // --- 2. GALLERY MANAGER ---
+        const textureLoader = new THREE.TextureLoader(); textureLoader.setCrossOrigin('anonymous');
+        
+        const GalleryManager = {
+            frames: [], wallTitles: [],
+            
+            createLabelMesh: function(text) {
+                if (!text) return null;
+                const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = 'rgba(10, 10, 10, 0.85)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.strokeStyle = '#32527B'; ctx.lineWidth = 12; ctx.strokeRect(0, 0, canvas.width, canvas.height);
+                ctx.font = 'bold 70px "Courier New", Courier, monospace'; ctx.fillStyle = '#FDCC0D';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+                const tex = new THREE.CanvasTexture(canvas);
+                const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+                return new THREE.Mesh(new THREE.PlaneGeometry(4, 1), mat);
+            },
+
+            createWallTitle: function(text1, text2 = '') {
+                const canvas = document.createElement('canvas');
+                canvas.width = 2048; canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = 'transparent'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.font = 'bold 120px "Courier New", Courier, monospace';
+                ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.shadowColor = '#FDCC0D'; ctx.shadowBlur = 20;
+
+                if (text2) {
+                    ctx.fillText(text1, canvas.width / 2, canvas.height / 2 - 60);
+                    ctx.font = 'bold 70px "Courier New", Courier, monospace';
+                    ctx.fillStyle = '#FDCC0D'; 
+                    ctx.fillText(text2, canvas.width / 2, canvas.height / 2 + 60);
+                } else {
+                    ctx.fillText(text1, canvas.width / 2, canvas.height / 2);
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
+                return new THREE.Mesh(new THREE.PlaneGeometry(18, 4.5), mat);
+            },
+
+            buildFrames: function(w, h, d) {
+                this.frames.forEach(f => { scene.remove(f.group); });
+                this.frames = [];
+                this.wallTitles.forEach(t => { scene.remove(t); t.geometry.dispose(); t.material.map.dispose(); t.material.dispose(); });
+                this.wallTitles = [];
+
+                const titleIntro = this.createWallTitle("INTRO", "SGX INFINITE GALLERY");
+                titleIntro.rotation.y = 0; scene.add(titleIntro); this.wallTitles.push(titleIntro);
+
+                const titleA = this.createWallTitle("LADO A");
+                titleA.rotation.y = Math.PI/2; scene.add(titleA); this.wallTitles.push(titleA);
+
+                const titleB = this.createWallTitle("LADO B");
+                titleB.rotation.y = -Math.PI/2; scene.add(titleB); this.wallTitles.push(titleB);
+
+                const titleOutro = this.createWallTitle("OUTRO");
+                titleOutro.rotation.y = Math.PI; scene.add(titleOutro); this.wallTitles.push(titleOutro);
+
+                TAMAÑOS_DE_CUADROS.forEach((data, index) => {
+                    const group = new THREE.Group();
+                    const canvasMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+                    const canvasGeo = new THREE.PlaneGeometry(data.height, data.height);
+                    const canvasMesh = new THREE.Mesh(canvasGeo, canvasMat);
+                    
+                    const borderGeo = new THREE.BoxGeometry(data.height + 0.4, data.height + 0.4, 0.2);
+                    const borderMat = new THREE.MeshBasicMaterial({ color: 0xFDCC0D }); // Neon Glow fijo
+                    const borderMesh = new THREE.Mesh(borderGeo, borderMat);
+                    borderMesh.position.z = -0.15;
+
+                    group.add(borderMesh); group.add(canvasMesh);
+
+                    let labelMesh = null;
+                    if(data.label) {
+                        labelMesh = this.createLabelMesh(data.label);
+                        labelMesh.position.set(0, -(data.height / 2) - 0.7, 0); group.add(labelMesh);
+                    }
+                    
+                    if(index === 0) group.rotation.y = 0;
+                    else if(index >= 1 && index <= 4) group.rotation.y = Math.PI/2;
+                    else if(index >= 5 && index <= 8) group.rotation.y = -Math.PI/2;
+                    else group.rotation.y = Math.PI;
+                    
+                    scene.add(group);
+                    this.frames.push({ group, canvasMesh, borderMesh, labelMesh, height: data.height, url: '' });
+                });
+
+                this.resetDefaultTextures();
+            },
+
+            updateFramePositions: function(w, h, d) {
+                if(this.wallTitles.length >= 4) {
+                    this.wallTitles[0].position.set(0, h/2 - 2, -d/2 + 0.15); // Intro
+                    this.wallTitles[1].position.set(-w/2 + 0.15, h/2 - 2, 0); // Lado A
+                    this.wallTitles[2].position.set(w/2 - 0.15, h/2 - 2, 0); // Lado B
+                    this.wallTitles[3].position.set(0, h/2 - 2, d/2 - 0.15); // Outro
+                }
+
+                const frameConfigs = [
+                    { px: 0, py: 0, pz: -d/2 + 0.1 },
+                    { px: -w/2 + 0.1, py: h/6, pz: -d/4 }, { px: -w/2 + 0.1, py: h/6, pz: d/4 }, { px: -w/2 + 0.1, py: -h/6, pz: -d/4 }, { px: -w/2 + 0.1, py: -h/6, pz: d/4 },
+                    { px: w/2 - 0.1, py: h/6, pz: -d/4 }, { px: w/2 - 0.1, py: h/6, pz: d/4 }, { px: w/2 - 0.1, py: -h/6, pz: -d/4 }, { px: w/2 - 0.1, py: -h/6, pz: d/4 },
+                    { px: 0, py: 0, pz: d/2 - 0.1 }
+                ];
+
+                this.frames.forEach((f, i) => { const c = frameConfigs[i]; if(c) f.group.position.set(c.px, c.py, c.pz); });
+            },
+
+            injectTexture: function(frameIndex, url) {
+                if(!this.frames[frameIndex]) return;
+                this.frames[frameIndex].url = url;
+                textureLoader.load(url, (texture) => {
+                    texture.encoding = THREE.sRGBEncoding; const aspect = texture.image.width / texture.image.height;
+                    const cMesh = this.frames[frameIndex].canvasMesh; const bMesh = this.frames[frameIndex].borderMesh; const targetH = this.frames[frameIndex].height;
+                    cMesh.geometry.dispose(); cMesh.geometry = new THREE.PlaneGeometry(targetH * aspect, targetH);
+                    bMesh.geometry.dispose(); bMesh.geometry = new THREE.BoxGeometry((targetH * aspect) + 0.4, targetH + 0.4, 0.2);
+                    cMesh.material.map = texture; cMesh.material.color.setHex(0xffffff); cMesh.material.needsUpdate = true;
+                });
+            },
+
+            resetDefaultTextures: function() {
+                this.frames.forEach((f, i) => { 
+                    if (SGX.config.frameUrls[i]) this.injectTexture(i, SGX.config.frameUrls[i]); 
+                });
+            }
+        };
+
+        // --- INICIALIZACIÓN ---
+        initRoom();
+
+        // --- NAVEGACIÓN Y BOTONES ---
+        document.getElementById('btn-intro').onclick = () => { SGX.targetAngle = 0; updateNavUI('btn-intro'); };
+        document.getElementById('btn-ladoa').onclick = () => { SGX.targetAngle = -Math.PI / 2; updateNavUI('btn-ladoa'); };
+        document.getElementById('btn-ladob').onclick = () => { SGX.targetAngle = Math.PI / 2; updateNavUI('btn-ladob'); };
+        document.getElementById('btn-outro').onclick = () => { SGX.targetAngle = Math.PI; updateNavUI('btn-outro'); };
+
+        function updateNavUI(activeId) {
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(activeId).classList.add('active');
+        }
+
+        // --- SISTEMA DE CÁMARA TÁCTIL Y SWIPE PARA MÓVILES ---
+        let isDragging = false;
+        let lastTouchX = 0;
+
+        window.addEventListener('pointerdown', (e) => {
+            if(e.target.closest('.nav-btn')) return;
+            isDragging = true;
+            lastTouchX = e.clientX;
+        });
+
+        window.addEventListener('pointerup', () => {
+            if(!isDragging) return;
+            isDragging = false;
+            
+            const snapAngles = [0, -Math.PI/2, Math.PI/2, Math.PI, -Math.PI];
+            let closest = snapAngles[0];
+            let minDiff = Math.abs(SGX.targetAngle - snapAngles[0]);
+            
+            for(let i = 1; i < snapAngles.length; i++) {
+                let diff = Math.abs(SGX.targetAngle - snapAngles[i]);
+                if(diff < minDiff) { minDiff = diff; closest = snapAngles[i]; }
+            }
+            SGX.targetAngle = closest;
+            
+            const targetUI = (closest === -Math.PI) ? Math.PI : closest;
+            if(targetUI === 0) updateNavUI('btn-intro');
+            else if(targetUI === -Math.PI/2) updateNavUI('btn-ladoa');
+            else if(targetUI === Math.PI/2) updateNavUI('btn-ladob');
+            else if(targetUI === Math.PI) updateNavUI('btn-outro');
+        });
+
+        function updateTracking(nx, ny) {
+            const dirX = SGX.config.invertirX ? -1 : 1; const dirY = SGX.config.invertirY ? -1 : 1;
+            // Portal Físico = Invertido (-1)
+            SGX.targetCamX = nx * SGX.config.amplitudX * dirX * -1;
+            SGX.targetCamY = -ny * SGX.config.amplitudY * dirY * -1;
+        }
+
+        window.addEventListener('pointermove', (e) => {
+            // Parallax tracking con ratón/dedo
+            const nx = (e.clientX / window.innerWidth - 0.5) * 2;
+            const ny = (e.clientY / window.innerHeight - 0.5) * 2;
+            updateTracking(nx, ny);
+            
+            if (isDragging) {
+                const deltaX = e.clientX - lastTouchX;
+                SGX.targetAngle -= deltaX * 0.005; 
+                lastTouchX = e.clientX;
+            }
+        });
+
+        // --- RENDER LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            SGX.currentAngle += (SGX.targetAngle - SGX.currentAngle) * 0.05;
+
+            let isFrontOrBack = Math.abs(SGX.targetAngle) % Math.PI < 0.1;
+            let targetZBase = isFrontOrBack ? SGX.config.camDistance : 0;
+            SGX.currentCamZBase += (targetZBase - SGX.currentCamZBase) * 0.05;
+
+            SGX.currentCamX += (SGX.targetCamX - SGX.currentCamX) * SGX.config.suavizado;
+            SGX.currentCamY += (SGX.targetCamY - SGX.currentCamY) * SGX.config.suavizado;
+
+            const offsetX = Math.cos(SGX.currentAngle) * SGX.currentCamX;
+            const offsetZ = Math.sin(SGX.currentAngle) * SGX.currentCamX;
+
+            camera.position.x = offsetX;
+            camera.position.y = SGX.currentCamY;
+            camera.position.z = SGX.currentCamZBase + offsetZ; 
+
+            const lookDist = 20;
+            const lookX = camera.position.x + Math.sin(SGX.currentAngle) * lookDist;
+            const lookZ = camera.position.z - Math.cos(SGX.currentAngle) * lookDist;
+            
+            camera.lookAt(lookX, camera.position.y, lookZ);
+
+            renderer.render(scene, camera);
+        }
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight; 
+            camera.updateProjectionMatrix(); 
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
