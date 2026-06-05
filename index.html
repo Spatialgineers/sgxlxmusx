@@ -167,7 +167,7 @@
         <a-entity id="rig" movement-controls="fly: true; speed: 0.3" position="0 0 0">
             <a-camera id="camera" position="0 1.6 0" look-controls="pointerLockEnabled: false"></a-camera>
             
-            <!-- CONTROLADOR IZQUIERDO: WRIST UI PARA VR -->
+            <!-- CONTROLADOR IZQUIERDO: WRIST UI UNIVERSAL (VR/AR) -->
             <a-entity id="left-hand" laser-controls="hand: left" raycaster="objects: .clickable; far: 5">
                 <a-entity id="tactical-wrist-ui" position="0 0.15 0.05" rotation="-45 0 0" visible="false">
                     <a-plane width="0.3" height="0.18" color="#1A1A1A" opacity="0.9" material="shader: flat" class="clickable">
@@ -216,7 +216,7 @@
 
     <!-- CORE LOGIC: SGX ENGINE -->
     <script>
-        // ESTADO GLOBAL COMPARTIDO (Evita desincronización entre 2D y 3D)
+        // ESTADO GLOBAL COMPARTIDO
         window.SGX_STATE = {
             locked: false,
             playing: true,
@@ -246,7 +246,8 @@
                 this.el.addEventListener('thumbstickmoved', this.onThumbstickMoved.bind(this));
             },
             onThumbstickMoved: function (evt) {
-                if (!this.anchor || window.SGX_STATE.locked) return; // Si está locked, aborta manipulación
+                // ABORTO ABSOLUTO SI ESTÁ BLOQUEADO
+                if (!this.anchor || window.SGX_STATE.locked) return; 
                 
                 const x = evt.detail.x; 
                 const y = evt.detail.y; 
@@ -298,7 +299,6 @@
                 const vrBtnLock = document.getElementById('vr-btn-lock');
                 const vrTextLock = document.getElementById('vr-text-lock');
 
-                let currentObjectUrl = null;
                 let isDragging = false;
                 let previousTouch = { x: 0, y: 0 };
                 let initialPinchDistance = null;
@@ -325,7 +325,7 @@
                     vrTextLock.setAttribute('value', window.SGX_STATE.locked ? 'MODO: LOCKED' : 'MODO: EDIT (DESBLOQUEADO)');
                     vrBtnLock.setAttribute('color', window.SGX_STATE.locked ? '#16a34a' : '#FF0055');
                     
-                    // Deshabilitar/Habilitar slider en 2D
+                    // Deshabilitar slider en 2D
                     scaleSlider.disabled = window.SGX_STATE.locked;
                 };
 
@@ -426,18 +426,17 @@
                 document.getElementById('btn-vr').addEventListener('click', () => { if (scene.hasLoaded) scene.enterVR(); });
 
                 scene.addEventListener('enter-vr', () => {
+                    // El Wrist UI ahora está visible en TODOS los modos inmersivos
+                    wristUI.setAttribute('visible', 'true');
+                    
                     if (scene.is('ar-mode')) {
-                        // En AR WebXR en Móvil el overlay DOM domina, escondemos el wrist UI por seguridad.
-                        wristUI.setAttribute('visible', 'false');
                         scene.setAttribute('background', 'transparent: true');
                         shadowPlane.setAttribute('visible', 'true');
                         vrGrid.setAttribute('visible', 'false');
                         statusBadge.textContent = 'AR PASSTHROUGH';
                         statusBadge.className = 'bg-cyan-500/20 text-cyan-400 border border-cyan-500 px-3 py-1 text-[10px] tracking-widest rounded-sm backdrop-blur-md';
                     } else {
-                        // MODO VR GAFAS: Mostramos el menu en la muñeca y ocultamos DOM
                         uiContainer.style.opacity = '0';
-                        wristUI.setAttribute('visible', 'true');
                         scene.setAttribute('background', 'color: #1A1A1A; transparent: false');
                         shadowPlane.setAttribute('visible', 'false');
                         vrGrid.setAttribute('visible', 'true');
