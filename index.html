@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SGX AR Passthrough Engine | Meta Quest Ready</title>
+    <title>SGX Multimodal Forge | AR/VR Engine</title>
     
-    <!-- 1. CORE DEPENDENCIES (CDN) -->
+    <!-- CORE DEPENDENCIES -->
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- 2. TACTICAL BRANDING & FLUID SCALING -->
+    <!-- TACTICAL BRANDING & SCALING -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
         
@@ -26,176 +26,374 @@
             background-color: var(--sgx-metal);
             margin: 0;
             overflow: hidden;
-            touch-action: none;
+            touch-action: none; /* Previene zoom/scroll nativo del navegador */
+            user-select: none;
         }
 
-        /* Glassmorphism Panel con cortes a 45 grados */
+        /* Glassmorphism Tactical Panel */
         .sgx-panel {
-            background: rgba(50, 82, 123, 0.3);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-left: 2px solid var(--sgx-cyan);
-            border-bottom: 2px solid var(--sgx-gold);
-            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 25px), calc(100% - 25px) 100%, 0 100%);
-            width: clamp(280px, 90vw, 500px);
+            background: rgba(26, 26, 26, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-top: 2px solid var(--sgx-cyan);
+            border-right: 2px solid var(--sgx-gold);
+            clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%);
+            box-shadow: 0 -10px 30px rgba(0, 255, 255, 0.1);
         }
 
-        /* Botón Táctico */
+        /* Tactical Button */
         .sgx-btn {
-            background: var(--sgx-gold);
-            color: var(--sgx-metal);
-            clip-path: polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px));
-            font-size: clamp(0.9rem, 2vw, 1.2rem);
-            transition: all 0.2s ease-in-out;
+            background: var(--sgx-blue);
+            color: white;
+            clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 1px;
+            border: 1px solid transparent;
         }
         
         .sgx-btn:hover, .sgx-btn:active {
             background: var(--sgx-cyan);
+            color: var(--sgx-metal);
             transform: scale(1.02);
         }
 
-        /* Ocultar UI de A-Frame por defecto para mantener "Clean Look" */
+        .sgx-btn-gold {
+            background: var(--sgx-gold);
+            color: var(--sgx-metal);
+        }
+
+        /* Select / Inputs */
+        .sgx-input {
+            background: rgba(0,0,0,0.5);
+            border: 1px solid var(--sgx-cyan);
+            color: var(--sgx-cyan);
+            clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+            outline: none;
+        }
+
+        /* Ocultar UI nativo de A-Frame */
         .a-enter-vr { display: none !important; }
+        
+        /* Ocultar input file original */
+        input[type="file"] { display: none; }
     </style>
 </head>
 <body>
 
-    <!-- 3. SGX TACTICAL UI (HUD) -->
-    <div id="sgx-ui" class="fixed inset-0 z-50 flex items-center justify-center pointer-events-none transition-opacity duration-500">
-        <div class="sgx-panel p-6 sm:p-10 flex flex-col items-center shadow-2xl pointer-events-auto">
-            <h1 class="font-black text-[#00FFFF] tracking-widest text-center uppercase mb-2" style="font-size: clamp(1.5rem, 4vw, 2.5rem);">
-                SGX AR CORE
-            </h1>
-            <p class="text-[#FDCC0D] text-xs tracking-widest mb-6 font-bold">SPATIALGINEERS LLC</p>
-            
-            <p class="text-gray-200 text-center mb-8" style="font-size: clamp(0.8rem, 1.5vw, 1rem); line-height: 1.6;">
-                MOTOR PASSTHROUGH INICIALIZADO.<br>
-                MODELO GLB ANCLADO A LOCAL-FLOOR.<br>
-                COLÓCATE EL QUEST Y ACTIVA LA INMERSIÓN.
-            </p>
+    <!-- DOM OVERLAY UI (Renderizado sobre AR/VR y Web) -->
+    <div id="sgx-ui" class="fixed inset-0 z-50 pointer-events-none flex flex-col justify-between">
+        
+        <!-- TOP HUD -->
+        <div class="p-4 flex justify-between items-start w-full">
+            <div>
+                <h1 class="font-black text-[#00FFFF] tracking-widest text-xl drop-shadow-md">SGX FORGE</h1>
+                <p class="text-[#FDCC0D] text-xs tracking-widest font-bold">MULTIMODAL XR ENGINE</p>
+            </div>
+            <div id="status-badge" class="bg-red-500/20 text-red-400 border border-red-500 px-3 py-1 text-[10px] tracking-widest rounded-sm backdrop-blur-md">
+                MODO 2D
+            </div>
+        </div>
 
-            <button id="btn-start-ar" class="sgx-btn font-black py-4 px-10 tracking-widest flex items-center gap-3">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-                ENTRAR A REALIDAD AUMENTADA
-            </button>
+        <!-- BOTTOM CONTROL PANEL -->
+        <div class="sgx-panel p-4 sm:p-6 w-full max-w-lg mx-auto pointer-events-auto flex flex-col gap-4">
+            
+            <!-- CONTROLES DE MODELO Y ANIMACIÓN -->
+            <div class="flex flex-col gap-3">
+                <label class="sgx-btn cursor-pointer p-3 text-center text-xs flex justify-center items-center gap-2">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    CARGAR MODELO LOCAL (.GLB)
+                    <input type="file" id="glb-upload" accept=".glb,.gltf">
+                </label>
+
+                <!-- ANIMATION CONTROLS (Ocultos hasta que haya animación) -->
+                <div id="anim-controls" class="hidden flex gap-2 w-full">
+                    <select id="anim-select" class="sgx-input p-3 text-xs w-2/3 cursor-pointer">
+                        <option value="">Seleccionar Animación...</option>
+                    </select>
+                    <button id="btn-play-pause" class="sgx-btn p-3 w-1/3 text-xs flex justify-center items-center gap-1">
+                        <span id="play-icon">⏸</span> PAUSA
+                    </button>
+                </div>
+            </div>
+
+            <!-- CONTROLES DE INMERSIÓN -->
+            <div class="flex gap-2 w-full pt-2 border-t border-gray-700/50">
+                <button id="btn-ar" class="sgx-btn sgx-btn-gold p-3 flex-1 text-sm flex justify-center items-center gap-2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><rect x="8" y="8" width="8" height="8" rx="1"></rect></svg>
+                    ENTRAR AR
+                </button>
+                <button id="btn-vr" class="sgx-btn p-3 flex-1 text-sm flex justify-center items-center gap-2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h4l3-9 5 18 3-9h5"></path></svg>
+                    ENTRAR VR
+                </button>
+            </div>
+            <p class="text-gray-400 text-[10px] text-center uppercase tracking-widest mt-1">Interacción: Un dedo para rotar. Dos dedos (Pinch) para escalar.</p>
         </div>
     </div>
 
-    <!-- 4. WEBXR SCENE ENGINE -->
-    <!-- referenceSpaceType: local-floor garantiza que Y=0 es el piso real del Quest/Móvil -->
+    <!-- WEBXR SCENE ENGINE -->
+    <!-- overlayElement inyecta la UI en sesiones inmersivas soportadas -->
     <a-scene 
-        sgx-core-logic
-        webxr="referenceSpaceType: local-floor; optionalFeatures: local-floor, hit-test;"
-        background="transparent: true"
+        sgx-multimodal-engine
+        webxr="referenceSpaceType: local-floor; optionalFeatures: dom-overlay, hit-test, local-floor; overlayElement: #sgx-ui"
+        background="color: #1A1A1A; transparent: false"
         renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true;"
         device-orientation-permission-ui="enabled: false">
         
-        <!-- ASSETS -->
-        <a-assets>
-            <!-- Modelo GLB animado público y altamente optimizado (Fox de Khronos) -->
-            <a-asset-item id="glb-model" src="https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models/2.0/Fox/glTF-Binary/Fox.glb" crossorigin="anonymous"></a-asset-item>
-        </a-assets>
-
-        <!-- CÁMARA (Rig) -->
+        <!-- CÁMARA & MANOS -->
         <a-entity id="rig" position="0 0 0">
-            <a-camera id="camera" position="0 1.6 0" look-controls="enabled: false" wasd-controls="enabled: false"></a-camera>
+            <a-camera id="camera" position="0 1.6 0" look-controls="enabled: false"></a-camera>
+            <!-- Controladores para VR -->
+            <a-entity laser-controls="hand: left" raycaster="objects: .clickable; far: 5"></a-entity>
+            <a-entity laser-controls="hand: right" raycaster="objects: .clickable; far: 5"></a-entity>
         </a-entity>
 
-        <!-- HOLOGRAMA ANCLADO AL PISO -->
-        <a-entity id="hologram-container" position="0 0 -2" visible="false">
-            
-            <!-- Modelo Animado. animation-mixer procesa el esqueleto. -->
-            <!-- Scale adjust depends on the model. The Fox is big, scaled down. -->
+        <!-- CONTENEDOR DEL HOLOGRAMA (Centro de rotación y escala) -->
+        <a-entity id="hologram-anchor" position="0 1 -2" rotation="0 0 0" scale="1 1 1">
+            <!-- Entidad Dinámica donde inyectamos el modelo -->
             <a-entity 
-                id="glb-entity"
-                gltf-model="#glb-model" 
-                scale="0.015 0.015 0.015" 
-                rotation="0 -30 0"
-                animation-mixer="clip: Walk; loop: repeat; timeScale: 1.2"
+                id="dynamic-model"
                 shadow="cast: true; receive: false">
             </a-entity>
-
-            <!-- Sombra de Contacto (Grounding) para maximizar inmersión en AR -->
-            <a-plane 
-                position="0 0.01 0" 
+            
+            <!-- Piso de Sombra Oculto (Aparece en AR para grounding visual) -->
+            <a-plane id="shadow-plane"
+                position="0 -1 0" 
                 rotation="-90 0 0" 
-                width="2" height="2" 
-                material="shader: flat; color: #1A1A1A; opacity: 0.4; transparent: true"
-                shadow="receive: true">
+                width="10" height="10" 
+                material="shader: flat; color: #000000; opacity: 0.3; transparent: true"
+                shadow="receive: true"
+                visible="false">
             </a-plane>
-
         </a-entity>
 
-        <!-- ILUMINACIÓN OPTIMIZADA (PBR) -->
-        <a-light type="ambient" color="#ffffff" intensity="0.8"></a-light>
-        <a-light type="directional" color="#FDCC0D" intensity="1.5" position="1 3 2" castShadow="true" shadow-mapSize="1024" shadow-bias="-0.001"></a-light>
+        <!-- ILUMINACIÓN -->
+        <a-light type="ambient" color="#ffffff" intensity="1.0"></a-light>
+        <a-light type="directional" color="#FDCC0D" intensity="1.5" position="1 3 2" castShadow="true" shadow-mapSize="1024"></a-light>
         <a-light type="directional" color="#00FFFF" intensity="0.5" position="-2 1 -1"></a-light>
-
     </a-scene>
 
-    <!-- 5. LÓGICA DEFENSIVA Y DE CONTROL -->
+    <!-- CORE LOGIC: SGX ENGINE -->
     <script>
-        AFRAME.registerComponent('sgx-core-logic', {
+        AFRAME.registerComponent('sgx-multimodal-engine', {
             init: function () {
                 const scene = this.el;
-                const uiLayer = document.getElementById('sgx-ui');
-                const btnStart = document.getElementById('btn-start-ar');
-                const hologram = document.getElementById('hologram-container');
-                const glbEntity = document.getElementById('glb-entity');
+                const modelEntity = document.getElementById('dynamic-model');
+                const hologramAnchor = document.getElementById('hologram-anchor');
+                const shadowPlane = document.getElementById('shadow-plane');
+                const statusBadge = document.getElementById('status-badge');
+                
+                // UI Elements
+                const fileInput = document.getElementById('glb-upload');
+                const animControls = document.getElementById('anim-controls');
+                const animSelect = document.getElementById('anim-select');
+                const btnPlayPause = document.getElementById('btn-play-pause');
+                const iconPlay = document.getElementById('play-icon');
+                const btnAR = document.getElementById('btn-ar');
+                const btnVR = document.getElementById('btn-vr');
 
-                // Defensive Programming: Desbloqueo forzado de Audio/Media Context al tap (Mobile Safari hack)
-                const unlockMedia = () => {
-                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                    ctx.resume();
-                    document.removeEventListener('touchstart', unlockMedia);
-                };
-                document.addEventListener('touchstart', unlockMedia, {once: true});
+                let isPlaying = true;
+                let currentObjectUrl = null;
+                let isDragging = false;
+                let previousTouch = { x: 0, y: 0 };
+                let initialPinchDistance = null;
+                let initialScale = { x: 1, y: 1, z: 1 };
 
-                // Botón Custom dispara la sesión Inmersiva (WebXR AR)
-                btnStart.addEventListener('click', () => {
-                    if (scene.systems.webxr) {
-                        // Verifica si el dispositivo soporta AR nativo (Quest Passthrough / ARCore)
-                        if (navigator.xr) {
-                            navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-                                if (supported) {
-                                    scene.systems.webxr.startSession('immersive-ar');
-                                } else {
-                                    alert("El navegador no soporta WebXR AR. Abriendo en 3D Viewer 360.");
-                                    scene.enterVR(); // Fallback a VR/3D regular
-                                }
-                            });
-                        } else {
-                            scene.enterVR();
-                        }
-                    }
+                // 1. GESTIÓN DE CARGA LOCAL
+                fileInput.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    // Limpiar URL anterior de la memoria
+                    if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+                    
+                    // Crear blob local
+                    currentObjectUrl = URL.createObjectURL(file);
+                    
+                    // Purgar modelo anterior y cargar nuevo
+                    modelEntity.removeAttribute('gltf-model');
+                    modelEntity.removeAttribute('animation-mixer');
+                    modelEntity.setAttribute('gltf-model', currentObjectUrl);
+                    
+                    // Resetear escala y rotación
+                    hologramAnchor.setAttribute('scale', '1 1 1');
+                    hologramAnchor.setAttribute('rotation', '0 0 0');
                 });
 
-                // Listener: Entrar a modo Inmersivo
-                scene.addEventListener('enter-vr', () => {
-                    // Ocultamos la UI Glassmorphism para inmersión total (0 fricción visual)
-                    uiLayer.style.opacity = "0";
-                    setTimeout(() => uiLayer.style.pointerEvents = "none", 500);
+                // 2. PARSEO DE ANIMACIONES AL CARGAR MODELO
+                modelEntity.addEventListener('model-loaded', (e) => {
+                    const model = e.detail.model;
+                    const animations = model.animations;
+                    
+                    animSelect.innerHTML = ''; // Limpiar select
+                    
+                    if (animations && animations.length > 0) {
+                        animControls.classList.remove('hidden');
+                        animControls.classList.add('flex');
+                        
+                        // Llenar dropdown
+                        animations.forEach((anim, index) => {
+                            const option = document.createElement('option');
+                            option.value = anim.name;
+                            option.textContent = anim.name;
+                            animSelect.appendChild(option);
+                        });
 
-                    // Validamos si entramos en AR (Passthrough)
-                    if (scene.is('ar-mode')) {
-                        hologram.setAttribute('visible', 'true');
-                        // Aseguramos la animación
-                        glbEntity.setAttribute('animation-mixer', 'clip: *; loop: repeat');
+                        // Arrancar primera animación
+                        modelEntity.setAttribute('animation-mixer', `clip: ${animations[0].name}; loop: repeat; timeScale: 1`);
+                        isPlaying = true;
+                        iconPlay.textContent = '⏸';
                     } else {
-                        // Fallback VR (Espacio negro infinito)
-                        scene.setAttribute('background', 'color: #1A1A1A; transparent: false');
-                        hologram.setAttribute('visible', 'true');
+                        animControls.classList.add('hidden');
+                        animControls.classList.remove('flex');
                     }
                 });
 
-                // Listener: Salir de modo Inmersivo
-                scene.addEventListener('exit-vr', () => {
-                    // Restauramos UI
-                    uiLayer.style.opacity = "1";
-                    uiLayer.style.pointerEvents = "auto";
-                    hologram.setAttribute('visible', 'false');
-                    scene.setAttribute('background', 'transparent: true');
+                // 3. EVENTOS DE CONTROL DE ANIMACIÓN
+                animSelect.addEventListener('change', (e) => {
+                    const clipName = e.target.value;
+                    modelEntity.setAttribute('animation-mixer', `clip: ${clipName}; timeScale: ${isPlaying ? 1 : 0}`);
                 });
+
+                btnPlayPause.addEventListener('click', () => {
+                    isPlaying = !isPlaying;
+                    iconPlay.textContent = isPlaying ? '⏸' : '▶';
+                    btnPlayPause.innerHTML = `<span id="play-icon">${iconPlay.textContent}</span> ${isPlaying ? 'PAUSA' : 'PLAY'}`;
+                    
+                    // Actualizar velocidad
+                    const currentClip = animSelect.value;
+                    if(currentClip) {
+                        modelEntity.setAttribute('animation-mixer', `clip: ${currentClip}; timeScale: ${isPlaying ? 1 : 0}`);
+                    }
+                });
+
+                // 4. MÁQUINA DE ESTADO INMERSIVO (XR)
+                btnAR.addEventListener('click', () => {
+                    if (navigator.xr) {
+                        navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+                            if (supported) {
+                                scene.systems.webxr.startSession('immersive-ar');
+                            } else {
+                                alert("Tu navegador o dispositivo no soporta WebXR AR.");
+                            }
+                        });
+                    }
+                });
+
+                btnVR.addEventListener('click', () => {
+                    scene.systems.webxr.startSession('immersive-vr');
+                });
+
+                scene.addEventListener('enter-vr', () => {
+                    if (scene.is('ar-mode')) {
+                        // MODO AR: Transparente y sombra activada
+                        scene.setAttribute('background', 'transparent: true');
+                        shadowPlane.setAttribute('visible', 'true');
+                        statusBadge.textContent = 'AR PASSTHROUGH';
+                        statusBadge.className = 'bg-cyan-500/20 text-cyan-400 border border-cyan-500 px-3 py-1 text-[10px] tracking-widest rounded-sm backdrop-blur-md';
+                    } else {
+                        // MODO VR: Espacio infinito
+                        scene.setAttribute('background', 'color: #1A1A1A; transparent: false');
+                        shadowPlane.setAttribute('visible', 'false');
+                        statusBadge.textContent = 'VR INMERSIÓN';
+                        statusBadge.className = 'bg-purple-500/20 text-purple-400 border border-purple-500 px-3 py-1 text-[10px] tracking-widest rounded-sm backdrop-blur-md';
+                    }
+                });
+
+                scene.addEventListener('exit-vr', () => {
+                    scene.setAttribute('background', 'color: #1A1A1A; transparent: false');
+                    shadowPlane.setAttribute('visible', 'false');
+                    statusBadge.textContent = 'MODO 2D';
+                    statusBadge.className = 'bg-red-500/20 text-red-400 border border-red-500 px-3 py-1 text-[10px] tracking-widest rounded-sm backdrop-blur-md';
+                });
+
+                // 5. MOTOR DE INTERACCIÓN ESPACIAL (TOUCH/MOUSE)
+                const isUIEvent = (e) => e.target.closest('.sgx-panel') || e.target.closest('button') || e.target.closest('select');
+
+                // TOUCH (Móviles / AR)
+                document.addEventListener('touchstart', (e) => {
+                    if (isUIEvent(e)) return;
+                    if (e.touches.length === 1) {
+                        isDragging = true;
+                        previousTouch = { x: e.touches[0].pageX, y: e.touches[0].pageY };
+                    } else if (e.touches.length === 2) {
+                        isDragging = false;
+                        const dx = e.touches[0].pageX - e.touches[1].pageX;
+                        const dy = e.touches[0].pageY - e.touches[1].pageY;
+                        initialPinchDistance = Math.sqrt(dx * dx + dy * dy);
+                        initialScale = hologramAnchor.getAttribute('scale');
+                    }
+                }, { passive: false });
+
+                document.addEventListener('touchmove', (e) => {
+                    if (isUIEvent(e)) return;
+                    e.preventDefault(); // Previene scroll de página
+                    
+                    if (e.touches.length === 1 && isDragging) {
+                        const deltaX = e.touches[0].pageX - previousTouch.x;
+                        const currentRot = hologramAnchor.getAttribute('rotation');
+                        
+                        // Rotar en el eje Y basándose en el movimiento X del dedo
+                        hologramAnchor.setAttribute('rotation', {
+                            x: currentRot.x,
+                            y: currentRot.y + deltaX * 0.5,
+                            z: currentRot.z
+                        });
+                        previousTouch = { x: e.touches[0].pageX, y: e.touches[0].pageY };
+                    } else if (e.touches.length === 2 && initialPinchDistance) {
+                        const dx = e.touches[0].pageX - e.touches[1].pageX;
+                        const dy = e.touches[0].pageY - e.touches[1].pageY;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        const scaleMod = dist / initialPinchDistance;
+                        hologramAnchor.setAttribute('scale', {
+                            x: initialScale.x * scaleMod,
+                            y: initialScale.y * scaleMod,
+                            z: initialScale.z * scaleMod
+                        });
+                    }
+                }, { passive: false });
+
+                document.addEventListener('touchend', () => {
+                    isDragging = false;
+                    initialPinchDistance = null;
+                });
+
+                // MOUSE (Desktop 2D)
+                document.addEventListener('mousedown', (e) => {
+                    if (isUIEvent(e)) return;
+                    isDragging = true;
+                    previousTouch = { x: e.pageX, y: e.pageY };
+                });
+
+                document.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                        const deltaX = e.pageX - previousTouch.x;
+                        const currentRot = hologramAnchor.getAttribute('rotation');
+                        hologramAnchor.setAttribute('rotation', {
+                            x: currentRot.x,
+                            y: currentRot.y + deltaX * 0.5,
+                            z: currentRot.z
+                        });
+                        previousTouch = { x: e.pageX, y: e.pageY };
+                    }
+                });
+
+                document.addEventListener('mouseup', () => isDragging = false);
+
+                // SCROLL WHEEL (Escala en Desktop)
+                document.addEventListener('wheel', (e) => {
+                    if (isUIEvent(e)) return;
+                    const scale = hologramAnchor.getAttribute('scale');
+                    const factor = e.deltaY > 0 ? 0.9 : 1.1; // Zoom in / out
+                    hologramAnchor.setAttribute('scale', {
+                        x: scale.x * factor,
+                        y: scale.y * factor,
+                        z: scale.z * factor
+                    });
+                }, { passive: true });
             }
         });
     </script>
