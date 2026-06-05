@@ -97,7 +97,7 @@
             box-shadow: 0 0 10px var(--sgx-gold);
         }
 
-        /* Ocultar UI nativo de A-Frame */
+        /* Ocultar UI nativo de A-Frame para mantener control total */
         .a-enter-vr { display: none !important; }
         input[type="file"] { display: none; }
     </style>
@@ -161,23 +161,22 @@
                 </button>
             </div>
             <p class="text-gray-400 text-[9px] text-center uppercase tracking-widest mt-1">
-                VR: L-Thumbstick = Moverse | R-Thumbstick = Escalar/Rotar
+                VR: L-Thumbstick = Vuelo Libre | R-Thumbstick = Escalar/Rotar
             </p>
         </div>
     </div>
 
     <!-- WEBXR SCENE ENGINE -->
-    <!-- overlayElement inyecta la UI en sesiones inmersivas (AR en Quest) -->
     <a-scene 
         sgx-multimodal-engine
-        webxr="referenceSpaceType: local-floor; optionalFeatures: dom-overlay, hit-test, local-floor; overlayElement: #sgx-ui"
+        webxr="referenceSpaceType: local-floor; optionalFeatures: local-floor, hit-test;"
         background="color: #1A1A1A; transparent: false"
         renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true;"
         device-orientation-permission-ui="enabled: false">
         
         <!-- CÁMARA & LOCOMOCIÓN -->
-        <!-- movement-controls habilita WASD en Desktop y Thumbstick Izquierdo en VR -->
-        <a-entity id="rig" movement-controls="fly: false; speed: 0.15" position="0 0 0">
+        <!-- fly: true permite volar hacia donde miras; speed ajustado a 0.3 para más fluidez -->
+        <a-entity id="rig" movement-controls="fly: true; speed: 0.3" position="0 0 0">
             <!-- look-controls="enabled: true" permite mirar con el mouse y cabeza VR -->
             <a-camera id="camera" position="0 1.6 0" look-controls="pointerLockEnabled: false"></a-camera>
             
@@ -211,13 +210,29 @@
         <a-light type="directional" color="#FDCC0D" intensity="1.5" position="1 3 2" castShadow="true" shadow-mapSize="1024"></a-light>
         <a-light type="directional" color="#00FFFF" intensity="0.5" position="-2 1 -1"></a-light>
         
-        <!-- Grid Floor visual para VR, para no perderse en la oscuridad -->
-        <a-grid id="vr-grid" material="color: #32527B; opacity: 0.2; transparent: true" visible="true"></a-grid>
+        <!-- Grid Floor visual (SGX Componente Custom WebGL) -->
+        <a-entity id="vr-grid" sgx-grid position="0 0 0" visible="true"></a-entity>
     </a-scene>
 
     <!-- CORE LOGIC: SGX ENGINE -->
     <script>
-        // 1. COMPONENTE DE MANIPULACIÓN PARA CONTROLES VR (Thumbstick)
+        // 0. GENERADOR DE GRID ESPACIAL TÁCTICO (WebGL Puro)
+        AFRAME.registerComponent('sgx-grid', {
+            init: function () {
+                const size = 100;
+                const divisions = 100;
+                const colorCenterLine = new THREE.Color(0x00FFFF); // Cyan SGX
+                const colorGrid = new THREE.Color(0x32527B); // Azul Metálico SGX
+                
+                const gridHelper = new THREE.GridHelper(size, divisions, colorCenterLine, colorGrid);
+                gridHelper.material.opacity = 0.25;
+                gridHelper.material.transparent = true;
+                
+                this.el.setObject3D('grid', gridHelper);
+            }
+        });
+
+        // 1. COMPONENTE DE MANIPULACIÓN PARA CONTROLES VR (Thumbstick Derecho)
         AFRAME.registerComponent('sgx-vr-manipulator', {
             init: function () {
                 this.anchor = document.getElementById('hologram-anchor');
@@ -270,6 +285,7 @@
                 const shadowPlane = document.getElementById('shadow-plane');
                 const vrGrid = document.getElementById('vr-grid');
                 const statusBadge = document.getElementById('status-badge');
+                const uiContainer = document.getElementById('sgx-ui');
                 
                 // UI Elements
                 const fileInput = document.getElementById('glb-upload');
@@ -360,21 +376,23 @@
                     updateScale(e.target.value);
                 });
 
-                // MÁQUINA DE ESTADO INMERSIVO
+                // MÁQUINA DE ESTADO INMERSIVO (Con llamadas API nativas de A-Frame)
                 btnAR.addEventListener('click', () => {
-                    if (navigator.xr) {
-                        navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-                            if (supported) scene.systems.webxr.startSession('immersive-ar');
-                            else alert("Tu navegador o dispositivo no soporta WebXR AR.");
-                        });
+                    if (scene.hasLoaded) {
+                        scene.enterAR(); // Usa la abstracción probada de A-Frame 
                     }
                 });
 
                 btnVR.addEventListener('click', () => {
-                    scene.systems.webxr.startSession('immersive-vr');
+                    if (scene.hasLoaded) {
+                        scene.enterVR(); // Forzamos VR directamente
+                    }
                 });
 
                 scene.addEventListener('enter-vr', () => {
+                    // Ocultamos la UI HTML en modo inmersivo para visores
+                    uiContainer.style.opacity = '0';
+
                     if (scene.is('ar-mode')) {
                         scene.setAttribute('background', 'transparent: true');
                         shadowPlane.setAttribute('visible', 'true');
@@ -391,6 +409,7 @@
                 });
 
                 scene.addEventListener('exit-vr', () => {
+                    uiContainer.style.opacity = '1';
                     scene.setAttribute('background', 'color: #1A1A1A; transparent: false');
                     shadowPlane.setAttribute('visible', 'false');
                     vrGrid.setAttribute('visible', 'true');
@@ -466,8 +485,6 @@
                 });
 
                 document.addEventListener('mouseup', () => isDragging = false);
-
-                // Scroll Wheel para rotar o escalar en Desktop si es necesario (ya cubierto por el slider)
             }
         });
     </script>
